@@ -6,6 +6,7 @@
   "homepage": "https://Fifth-Wave.github.io/goit-js-hw-11",
   "scripts": {
     "dev": "parcel src/*.html",
+    "build": "parcel build src/*.html --public-url /goit-js-hw-11/"
   },
   "repository": {
     "type": "git",
@@ -23,5 +24,9 @@
     "parcel-plugin-nuke-dist": "^1.0.1",
     "posthtml-include": "^1.6.2",
     "sass": "^1.32.8"
+  },
+  "dependencies": {
+    "axios": "^0.26.0",
+    "notiflix": "^3.2.4"
   }
 }
