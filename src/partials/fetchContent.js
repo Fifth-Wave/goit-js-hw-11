@@ -11,7 +11,6 @@ export class FetchContent {
   }
 
   getPictures(keyWords, { picPerPage }) {
-    console.log(keyWords, picPerPage);
     if (keyWords) {
       this.keyWords = keyWords;
 

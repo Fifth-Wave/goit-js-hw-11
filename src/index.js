@@ -7,11 +7,9 @@ import { Notify } from 'notiflix';
 import SimpleLightbox from 'simplelightbox';
 import 'simplelightbox/dist/simple-lightbox.min.css';
 import { options } from './partials/fetchOptions';
-import throttle from 'lodash.throttle';
 
 let isPageLoaded = true;
 let last_known_scroll_position = 0;
-let i = 0;
 
 const elements = {
   searchButton: document.querySelector('.search-form button'),
@@ -29,7 +27,8 @@ loadMorebtn.btnEl.addEventListener('click', onLoadMoreClick);
 elements.searchForm.addEventListener('submit', onSubmit);
 
 function onSubmit(event) {
-  document.addEventListener('scroll', onScroll);
+  last_known_scroll_position = 0;
+  window.addEventListener('scroll', onScroll);
 
   elements.galleryContainer.innerHTML = '';
   event.preventDefault();
@@ -40,12 +39,14 @@ function onSubmit(event) {
   isPageLoaded = false;
   const codeWords = inputValue.split(' ');
 
-  fetchContent
-    .getPictures(codeWords, getPicPerPage())
-    .then(respondProcessing)
-    .finally(function () {
-      isPageLoaded = true;
-    });
+  const picPerPage = getPicPerPage();
+  fetchResults(codeWords, picPerPage);
+}
+
+async function fetchResults(codeWords, picPerPage) {
+  const r = await fetchContent.getPictures(codeWords, picPerPage);
+  const t = await respondProcessing(r);
+  isPageLoaded = await true;
 }
 
 function getPicPerPage() {
@@ -75,7 +76,7 @@ function getPicPerPage() {
 
   return {
     picPerPage: picPerHeight + 2,
-    picPerLine: 1,
+    picPerLine: 2,
   };
 }
 
@@ -92,7 +93,7 @@ function respondProcessing({ data }) {
 
   if (fetchContent.pageNo * fetchContent.picPerPage >= data.totalHits) {
     Notify.info("We're sorry, but you've reached the end of search results.");
-    document.removeEventListener('scroll', onScroll);
+    window.removeEventListener('scroll', onScroll);
     fetchContent.pageNo = 0;
     loadMorebtn.turnOff();
     elements.searchForm.reset();
@@ -102,26 +103,20 @@ function respondProcessing({ data }) {
 }
 
 function onLoadMoreClick() {
-  fetchContent
-    .getPictures('', {})
-    .then(respondProcessing)
-    .finally((isPageLoaded = true));
+  fetchResults('', {});
 }
 
 function sectionRender({ hits }) {
   elements.galleryContainer.insertAdjacentHTML('beforeend', imgCard(hits));
 }
 //          infinit scroll
-function onScroll(evt) {
+function onScroll() {
   const { height: cardHeight } = document
     .querySelector('.gallery')
     .firstElementChild.getBoundingClientRect();
 
   if (scrollY - last_known_scroll_position > cardHeight * 2) {
     last_known_scroll_position = scrollY;
-
-    fetchContent
-      .getPictures('', { picPerPage: getPicPerPage().picPerLine * 2 })
-      .then(respondProcessing);
+    fetchResults('', { picPerPage: getPicPerPage().picPerLine * 2 });
   }
 }
