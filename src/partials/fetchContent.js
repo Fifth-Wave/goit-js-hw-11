@@ -10,13 +10,16 @@ export class FetchContent {
     this.API_KEY = API_KEY;
   }
 
-  getPictures(keyWords) {
+  getPictures(keyWords, { picPerPage }) {
+    console.log(keyWords, picPerPage);
     if (keyWords) {
       this.keyWords = keyWords;
 
       this.pageNo = 0;
     }
-
+    if (picPerPage) {
+      this.picPerPage = picPerPage;
+    }
     this.pageNo += 1;
     return axios.get(
       `${this.BASE_URL}/?key=${this.API_KEY}&q=${this.keyWords.join('+')}&image_type=photo&page=${

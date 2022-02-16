@@ -7,8 +7,11 @@ import { Notify } from 'notiflix';
 import SimpleLightbox from 'simplelightbox';
 import 'simplelightbox/dist/simple-lightbox.min.css';
 import { options } from './partials/fetchOptions';
+import throttle from 'lodash.throttle';
 
 let isPageLoaded = true;
+let last_known_scroll_position = 0;
+let i = 0;
 
 const elements = {
   searchButton: document.querySelector('.search-form button'),
@@ -19,12 +22,15 @@ const elements = {
 
 const fetchContent = new FetchContent(options);
 const loadMorebtn = new LoadMoreBnt('.load-more');
+const simpleLightbox = new SimpleLightbox('.gallery a');
 
 loadMorebtn.btnEl.addEventListener('click', onLoadMoreClick);
 
 elements.searchForm.addEventListener('submit', onSubmit);
 
 function onSubmit(event) {
+  document.addEventListener('scroll', onScroll);
+
   elements.galleryContainer.innerHTML = '';
   event.preventDefault();
   let inputValue = event.currentTarget.elements.searchQuery.value;
@@ -35,11 +41,42 @@ function onSubmit(event) {
   const codeWords = inputValue.split(' ');
 
   fetchContent
-    .getPictures(codeWords)
+    .getPictures(codeWords, getPicPerPage())
     .then(respondProcessing)
     .finally(function () {
       isPageLoaded = true;
     });
+}
+
+function getPicPerPage() {
+  const windowWidth = window.screen.width;
+  const picPerHeight = parseInt(window.screen.height / 210);
+
+  if (windowWidth / 4 > 260) {
+    return {
+      picPerPage: (picPerHeight + 2) * 4,
+      picPerLine: 4,
+    };
+  }
+
+  if (windowWidth / 3 > 260) {
+    return {
+      picPerPage: (picPerHeight + 2) * 3,
+      picPerLine: 3,
+    };
+  }
+
+  if (windowWidth / 2 > 260) {
+    return {
+      picPerPage: (picPerHeight + 2) * 2,
+      picPerLine: 2,
+    };
+  }
+
+  return {
+    picPerPage: picPerHeight + 2,
+    picPerLine: 1,
+  };
 }
 
 function respondProcessing({ data }) {
@@ -55,22 +92,18 @@ function respondProcessing({ data }) {
 
   if (fetchContent.pageNo * fetchContent.picPerPage >= data.totalHits) {
     Notify.info("We're sorry, but you've reached the end of search results.");
+    document.removeEventListener('scroll', onScroll);
     fetchContent.pageNo = 0;
     loadMorebtn.turnOff();
     elements.searchForm.reset();
   }
   sectionRender(data);
-  new SimpleLightbox('.gallery a', {
-    captions: true,
-    captionsData: 'alt',
-    captionDelay: 250,
-  });
-  // rendering page
+  simpleLightbox.refresh();
 }
 
 function onLoadMoreClick() {
   fetchContent
-    .getPictures()
+    .getPictures('', {})
     .then(respondProcessing)
     .finally((isPageLoaded = true));
 }
@@ -78,13 +111,17 @@ function onLoadMoreClick() {
 function sectionRender({ hits }) {
   elements.galleryContainer.insertAdjacentHTML('beforeend', imgCard(hits));
 }
-//          smooth scroll
+//          infinit scroll
+function onScroll(evt) {
+  const { height: cardHeight } = document
+    .querySelector('.gallery')
+    .firstElementChild.getBoundingClientRect();
 
-// const { height: cardHeight } = document
-//   .querySelector('.gallery')
-//   .firstElementChild.getBoundingClientRect();
+  if (scrollY - last_known_scroll_position > cardHeight * 2) {
+    last_known_scroll_position = scrollY;
 
-// window.scrollBy({
-//   top: cardHeight * 2,
-//   behavior: 'smooth',
-// });
+    fetchContent
+      .getPictures('', { picPerPage: getPicPerPage().picPerLine * 2 })
+      .then(respondProcessing);
+  }
+}
