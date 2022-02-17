@@ -2,14 +2,14 @@ import './sass/main.scss';
 import { FetchContent } from './partials/fetchContent';
 import { LoadMoreBnt } from './partials/loadMoreBtn';
 import imgCard from './partials/img-card.hbs';
-
 import { Notify } from 'notiflix';
 import SimpleLightbox from 'simplelightbox';
 import 'simplelightbox/dist/simple-lightbox.min.css';
 import { options } from './partials/fetchOptions';
 
 let isPageLoaded = true;
-let last_known_scroll_position = 0;
+let observerEl = null;
+// let last_known_scroll_position = 0;
 
 const elements = {
   searchButton: document.querySelector('.search-form button'),
@@ -21,15 +21,13 @@ const elements = {
 const fetchContent = new FetchContent(options);
 const loadMorebtn = new LoadMoreBnt('.load-more');
 const simpleLightbox = new SimpleLightbox('.gallery a');
+const observer = new IntersectionObserver(infinitScroll, { threshold: 0.5 });
 
 loadMorebtn.btnEl.addEventListener('click', onLoadMoreClick);
 
 elements.searchForm.addEventListener('submit', onSubmit);
 
 function onSubmit(event) {
-  last_known_scroll_position = 0;
-  window.addEventListener('scroll', onScroll);
-
   elements.galleryContainer.innerHTML = '';
   event.preventDefault();
   let inputValue = event.currentTarget.elements.searchQuery.value;
@@ -45,8 +43,9 @@ function onSubmit(event) {
 
 async function fetchResults(codeWords, picPerPage) {
   const r = await fetchContent.getPictures(codeWords, picPerPage);
-  const t = await respondProcessing(r);
-  isPageLoaded = await true;
+  const t = respondProcessing(r);
+
+  isPageLoaded = true;
 }
 
 function getPicPerPage() {
@@ -86,6 +85,12 @@ function respondProcessing({ data }) {
     return;
   }
 
+  sectionRender(data);
+  simpleLightbox.refresh();
+  observer.disconnect();
+  observerEl = elements.galleryContainer.lastElementChild;
+  observer.observe(observerEl);
+
   if (fetchContent.pageNo === 1) {
     Notify.success(`Hooray! We found ${data.totalHits} images.`);
     loadMorebtn.turnOn();
@@ -93,13 +98,11 @@ function respondProcessing({ data }) {
 
   if (fetchContent.pageNo * fetchContent.picPerPage >= data.totalHits) {
     Notify.info("We're sorry, but you've reached the end of search results.");
-    window.removeEventListener('scroll', onScroll);
     fetchContent.pageNo = 0;
     loadMorebtn.turnOff();
     elements.searchForm.reset();
+    observer.disconnect();
   }
-  sectionRender(data);
-  simpleLightbox.refresh();
 }
 
 function onLoadMoreClick() {
@@ -110,13 +113,8 @@ function sectionRender({ hits }) {
   elements.galleryContainer.insertAdjacentHTML('beforeend', imgCard(hits));
 }
 //          infinit scroll
-function onScroll() {
-  const { height: cardHeight } = document
-    .querySelector('.gallery')
-    .firstElementChild.getBoundingClientRect();
 
-  if (scrollY - last_known_scroll_position > cardHeight * 2) {
-    last_known_scroll_position = scrollY;
-    fetchResults('', { picPerPage: getPicPerPage().picPerLine * 2 });
-  }
+function infinitScroll(entries, observer) {
+  if (entries[0].intersectionRatio <= 0) return;
+  fetchResults('', { picPerPage: getPicPerPage().picPerLine * 2 });
 }
